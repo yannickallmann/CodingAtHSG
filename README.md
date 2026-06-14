@@ -4,7 +4,7 @@
 
 A data-driven tool to estimate the fair market value of any luxury watch, built as the group project for Skills: Introduction to Programming at the University of St. Gallen (HSG).
 
-**Authors:** Jan Nemeth, Daniel Kullmann, Timon Mata, Julian Kreiliger, Philipp Sathy, Yannick Allmann
+**Authors:** Jan Nemeth, Daniel Kullmann, Timon Mata, Julian Kreiliger, Philipp Sajthy, Yannick Allmann
 
 ------------------------------------------------------------------------
 
@@ -22,9 +22,9 @@ We work with a Kaggle dataset of luxury watch listings, clean it, explore it, an
 
 You will notice that the code appears in two places. This is intentional:
 
-**The notebook (`LuxuryWatches.ipynb`)** is the story. It walks through every step of the project — data loading, cleaning, exploration, modelling, and evaluation — with full explanations and visualizations at each stage. It is meant to be read and graded.
+**The notebook (`LuxuryWatches.ipynb`)** is the story. It walks through every step of the project — data loading, cleaning, exploration, modelling, and evaluation — with full explanations and visualizations at each stage. It is meant to be read and graded. It shows how we progressed through the project.
 
-**The source files (`src/`)** are the engine. The same logic is re-implemented as clean, documented Python classes that power the Streamlit app and the training script. This separation means the app can run without anyone ever opening Jupyter.
+**The source files (`src/`)** are the engine. The same logic is re-implemented as clean, documented Python classes that power the Streamlit app and the training script. This separation means the app can run without anyone ever opening Jupyter. All you need to do to run it is to run `train.py` to train the model and then start the app via `app.py`.
 
 In short: the notebook is hand-written step by step so the whole analysis stays transparent and reproducible for the reader, while the `src/` classes mirror that same logic in a form built for deployment. The two are maintained in parallel and kept in sync by hand.
 
@@ -35,6 +35,9 @@ In short: the notebook is hand-written step by step so the whole analysis stays 
 ### 1. Clone the repository and install dependencies
 
 This project requires **Python ≥ 3.11**.
+
+
+To run it in powershell with the following commands:
 
 ``` bash
 git clone https://github.com/yannickallmann/CodingAtHSG.git
