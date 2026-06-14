@@ -4,7 +4,7 @@
 
 A data-driven tool to estimate the fair market value of any luxury watch, built as the group project for Skills: Introduction to Programming at the University of St. Gallen (HSG).
 
-**Authors:** Jan Nemeth, Daniel Kullmann, Timon, Julian, Philipp Sathy, Yannick Allmann
+**Authors:** Jan Nemeth, Daniel Kullmann, Timon Mata, Julian Kreiliger, Philipp Sathy, Yannick Allmann
 
 ------------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 
 ### 2. Train and save the model
 
-This step trains the XGBoost model and saves it to disk. It takes roughly 2–5 minutes depending on your machine.
+This step trains the XGBoost model and saves it to disk. It takes roughly 20 minutes depending on your machine.
 
 ``` bash
 python train.py
@@ -68,7 +68,7 @@ python -m streamlit run app.py
 
 Either way, run the command from the repository root so the app finds `src/` and `models/`. The estimator opens in your browser at `http://localhost:8501` (open the URL manually if it doesn't). Select a brand, model, and watch specifications, then click "Estimate Price". Stop the app with `Ctrl+C` in the terminal.
 
-### 4. (Optional) Run the notebook
+### 4 Run the notebook
 
 Open `LuxuryWatches.ipynb` in Jupyter or VS Code and run all cells top to bottom. The hyperparameter tuning step (Part 6) takes roughly 5–10 minutes.
 
