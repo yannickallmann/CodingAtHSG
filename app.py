@@ -3,8 +3,10 @@ app.py
 ------
 Streamlit web application for the Luxury Watch Price Estimator.
 
-Run with:
+Run from the repository root with:
     streamlit run app.py
+or, if the streamlit command is not on PATH:
+    python -m streamlit run app.py
 
 The app loads a pre-trained WatchPriceModel and allows users to input
 watch specifications to get an estimated market price.
@@ -167,18 +169,24 @@ st.divider()
 # ------------------------------------------------------------------
 
 if st.button("Estimate Price", type="primary", use_container_width=True):
-    with st.spinner("Calculating..."):
-        estimated_price = model.predict(
-            brand=brand,
-            model_name=model_name,
-            case_material=case_material,
-            condition=condition,
-            movement=movement,
-            bracelet_material=bracelet_material,
-            sex=sex,
-            size=size if size else None,
-            yop=yop if yop else None,
-        )
+    try:
+        with st.spinner("Calculating..."):
+            estimated_price = model.predict(
+                brand=brand,
+                model_name=model_name,
+                case_material=case_material,
+                condition=condition,
+                movement=movement,
+                bracelet_material=bracelet_material,
+                sex=sex,
+                size=size if size else None,
+                yop=yop if yop else None,
+            )
+    except ValueError as e:
+        # predict() validates all inputs and rejects unknown or
+        # out-of-range values with a descriptive message.
+        st.error(f"Invalid input: {e}")
+        st.stop()
 
     st.success(f"### Estimated Market Value: ${estimated_price:,.2f}")
     st.caption(

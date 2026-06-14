@@ -25,13 +25,43 @@ class WatchEDA:
     notebook. No method modifies the underlying DataFrame.
     """
 
+    # Columns that every plot method may rely on. Validated in __init__ so
+    # a missing column fails loudly here instead of deep inside a plot call.
+    _REQUIRED_COLS = [
+        "price", "brand", "model", "size", "yop",
+        "case_material", "bracelet_material", "condition",
+    ]
+
     def __init__(self, data: pd.DataFrame):
         """
         Parameters
         ----------
         data : pd.DataFrame
             Cleaned DataFrame produced by WatchDataCleaner.clean().
+            Must contain all expected columns and strictly positive,
+            non-missing prices.
+
+        Raises
+        ------
+        KeyError
+            If any expected column is missing.
+        ValueError
+            If 'price' contains missing or non-positive values (the log
+            transform requires strictly positive prices).
         """
+        missing_cols = [c for c in self._REQUIRED_COLS if c not in data.columns]
+        if missing_cols:
+            raise KeyError(
+                f"Input data is missing expected columns: {missing_cols}. "
+                "Run WatchDataCleaner.clean() first."
+            )
+
+        if data["price"].isna().any() or (data["price"] <= 0).any():
+            raise ValueError(
+                "Column 'price' must be strictly positive and non-missing "
+                "for the log transform. Run WatchDataCleaner.clean() first."
+            )
+
         self._data = data.copy()
 
         # Add log_price for all visualizations that need it
@@ -103,8 +133,10 @@ class WatchEDA:
         Parameters
         ----------
         top_n : int
-            Number of top models to display. Default is 20.
+            Number of top models to display. Must be a positive integer.
+            Default is 20.
         """
+        self._validate_top_n(top_n)
         models_df = (
             self._data["model"]
             .value_counts()
@@ -162,8 +194,10 @@ class WatchEDA:
         Parameters
         ----------
         top_n : int
-            Number of top brands to display. Default is 10.
+            Number of top brands to display. Must be a positive integer.
+            Default is 10.
         """
+        self._validate_top_n(top_n)
         top_brands = self._data["brand"].value_counts().head(top_n).index
         plot_data = self._data[self._data["brand"].isin(top_brands)].copy()
 
@@ -184,8 +218,10 @@ class WatchEDA:
         Parameters
         ----------
         top_n : int
-            Number of top case materials to display. Default is 10.
+            Number of top case materials to display. Must be a positive
+            integer. Default is 10.
         """
+        self._validate_top_n(top_n)
         top_materials = (self._data["case_material"]
                          .value_counts().head(top_n).index)
         plot_data = self._data[
@@ -209,8 +245,10 @@ class WatchEDA:
         Parameters
         ----------
         top_n : int
-            Number of top bracelet materials to display. Default is 10.
+            Number of top bracelet materials to display. Must be a positive
+            integer. Default is 10.
         """
+        self._validate_top_n(top_n)
         top_materials = (self._data["bracelet_material"]
                          .value_counts().head(top_n).index)
         plot_data = self._data[
@@ -242,8 +280,15 @@ class WatchEDA:
         plt.show()
 
     def plot_missing_values(self) -> None:
-        """Bar plot showing the percentage of missing values per column."""
-        missing = self._data.isna().mean() * 100
+        """
+        Bar plot showing the percentage of missing values per column.
+
+        The synthetic 'log_price' column added in __init__ is excluded —
+        it is derived from 'price' and not part of the original data.
+        """
+        missing = (
+            self._data.drop(columns=["log_price"]).isna().mean() * 100
+        )
 
         plt.figure(figsize=(10, 6))
         sns.barplot(x=missing.index, y=missing.values, color="violet")
@@ -252,3 +297,27 @@ class WatchEDA:
         plt.title("Percentage of Missing Values by Column")
         plt.tight_layout()
         plt.show()
+
+    # ------------------------------------------------------------------
+    # Static helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_top_n(top_n: int) -> None:
+        """
+        Validate that top_n is a positive integer.
+
+        Parameters
+        ----------
+        top_n : int
+            Value to validate.
+
+        Raises
+        ------
+        ValueError
+            If top_n is not a positive integer.
+        """
+        if not isinstance(top_n, int) or isinstance(top_n, bool) or top_n < 1:
+            raise ValueError(
+                f"top_n must be a positive integer, got {top_n!r}."
+            )

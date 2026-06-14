@@ -12,11 +12,17 @@ Usage:
     model.fit(df)
     model.save("models/watch_price_model.joblib")
 
-    # Prediction (e.g. in Streamlit)
+    # Prediction (e.g. in Streamlit) — all nine arguments are required
     model = WatchPriceModel()
     model.load("models/watch_price_model.joblib")
-    price = model.predict(brand="Rolex", model_name="Daytona", ...)
+    price = model.predict(
+        brand="Rolex", model_name="Daytona", case_material="Steel",
+        condition="Very good", movement="Automatic", bracelet_material="Steel",
+        sex="Men's watch/Unisex", size=40, yop=2018,
+    )
 """
+
+import datetime
 
 import numpy as np
 import pandas as pd
@@ -66,7 +72,16 @@ class WatchPriceModel:
     # Categorical columns that receive 'Unknown' for missing values
     _CATEGORICAL_COLS = _LOW_CARD_COLS + _HIGH_CARD_COLS
 
+    # Plausible numeric input ranges for predict(). These mirror the
+    # validation bounds enforced by WatchDataCleaner on the training data
+    # (_clean_size: 20-60 mm, _clean_yop: 1500 to current year). Values
+    # outside these ranges were treated as missing during training, so
+    # accepting them at inference time would create a distribution shift.
+    _SIZE_RANGE_MM = (20, 60)
+    _YOP_MIN = 1500
+
     def __init__(self):
+        """Initialize an untrained model with empty pipeline and data slots."""
         self._pipeline: Pipeline | None = None
         self._ridge_pipeline: Pipeline | None = None
         self._X_train: pd.DataFrame | None = None
@@ -80,21 +95,58 @@ class WatchPriceModel:
     # ------------------------------------------------------------------
 
     def fit(self, data: pd.DataFrame, test_size: float = 0.2,
-            n_iter: int = 5, random_state: int = 42) -> None:
+            n_iter: int = 25, random_state: int = 42) -> None:
         """
         Preprocess the data and train the XGBoost pipeline.
 
         Parameters
         ----------
         data : pd.DataFrame
-            Cleaned DataFrame from WatchDataCleaner.clean().
+            Cleaned DataFrame from WatchDataCleaner.clean(). Must contain
+            all feature columns and a strictly positive, non-missing
+            'price' column.
         test_size : float
-            Fraction of data held out for final evaluation. Default 0.2.
+            Fraction of data held out for final evaluation. Must be
+            strictly between 0 and 1. Default 0.2.
         n_iter : int
-            Number of hyperparameter combinations to try. Default 5.
+            Number of hyperparameter combinations passed to
+            RandomizedSearchCV. Each combination is evaluated with 5-fold
+            cross-validation, so the total number of model fits is
+            n_iter * 5, plus one final refit on the full training set
+            (125 fits at the default). Must be at least 1. Default 25.
         random_state : int
             Random seed for reproducibility. Default 42.
+
+        Raises
+        ------
+        KeyError
+            If a required column is missing from data.
+        ValueError
+            If test_size or n_iter is out of range, or if 'price'
+            contains missing or non-positive values.
         """
+        if not 0.0 < test_size < 1.0:
+            raise ValueError(
+                f"test_size must be strictly between 0 and 1, got {test_size!r}."
+            )
+        if not isinstance(n_iter, int) or isinstance(n_iter, bool) or n_iter < 1:
+            raise ValueError(
+                f"n_iter must be a positive integer, got {n_iter!r}."
+            )
+
+        required = self._CATEGORICAL_COLS + ["size", "yop", "price"]
+        missing = [c for c in required if c not in data.columns]
+        if missing:
+            raise KeyError(
+                f"Input data is missing expected columns: {missing}. "
+                "Run WatchDataCleaner.clean() first."
+            )
+        if data["price"].isna().any() or (data["price"] <= 0).any():
+            raise ValueError(
+                "Column 'price' must be strictly positive and non-missing "
+                "for the log transform. Run WatchDataCleaner.clean() first."
+            )
+
         self._watch_data = data.copy()
         prepared = self._preprocess(data)
         self._split(prepared, test_size, random_state)
@@ -243,41 +295,91 @@ class WatchPriceModel:
         """
         Predict the market price for a single watch.
 
+        All categorical inputs are validated against the dataset the model
+        was fitted on — use get_valid_options() to obtain the allowed
+        values. Unknown values raise a ValueError instead of silently
+        degrading the prediction. The literal value "Unknown" is always
+        accepted: it is the placeholder the model itself uses for missing
+        categoricals during training. In the rare case that a valid value
+        occurs only in the held-out test split (and was therefore never
+        seen by the model), it is treated as missing.
+
         Parameters
         ----------
         brand : str
+            Watch brand, e.g. "Rolex". Unseen brands would fall back to
+            the target encoder's global prior mean; they are rejected here.
         model_name : str
+            Watch model, e.g. "Daytona". Same fallback/rejection as brand.
         case_material : str
+            Case material, e.g. "Steel".
         condition : str
+            Condition category, e.g. "Very good".
         movement : str
+            Movement type, e.g. "Automatic".
         bracelet_material : str
+            Bracelet material, e.g. "Steel".
         sex : str
+            Target wearer category from the listing.
         size : float or None
+            Case diameter in mm, between 20 and 60, or None if unknown
+            (treated as missing by the model).
         yop : int or None
+            Year of production, between 1500 and the current year, or
+            None if unknown (treated as missing by the model).
 
         Returns
         -------
         float
             Estimated market price in USD.
+
+        Raises
+        ------
+        RuntimeError
+            If the model has not been trained or loaded.
+        ValueError
+            If a categorical value is unknown or a numeric value lies
+            outside its plausible range.
         """
         if self._pipeline is None:
             raise RuntimeError("Model not trained or loaded. "
                                "Call fit() or load() first.")
+
+        self._validate_predict_inputs(
+            categorical_inputs={
+                "brand":             brand,
+                "model":             model_name,
+                "case_material":     case_material,
+                "condition":         condition,
+                "movement":          movement,
+                "bracelet_material": bracelet_material,
+                "sex":               sex,
+            },
+            size=size,
+            yop=yop,
+        )
 
         user_data = pd.DataFrame({
             "brand":             [brand],
             "model":             [model_name],
             "case_material":     [case_material],
             "condition":         [condition],
-            "size":              [size],
+            "size":              pd.array([size], dtype="Float64"),
             "movement":          [movement],
             "yop":               pd.array([yop], dtype="Int64"),
             "bracelet_material": [bracelet_material],
             "sex":               [sex],
         })
 
+        # Anchor the category codes to the *training* categories. A plain
+        # astype("category") on a single row would always yield code 0,
+        # which XGBoost would silently misinterpret. Values not present in
+        # the training split become NaN and are handled as missing.
         for col in self._LOW_CARD_COLS:
-            user_data[col] = user_data[col].astype("category")
+            user_data[col] = pd.Categorical(
+                user_data[col],
+                categories=self._X_train[col].cat.categories,
+            )
 
         user_data = user_data[self._X_train.columns]
         log_price = self._pipeline.predict(user_data)[0]
@@ -292,10 +394,26 @@ class WatchPriceModel:
         -------
         dict
             Keys are column names, values are sorted lists of valid options.
+
+        Raises
+        ------
+        RuntimeError
+            If the model has not been trained or loaded.
+        ValueError
+            If 'size' or 'yop' contains no valid values, so no input
+            range can be derived for the UI.
         """
         if self._watch_data is None:
             raise RuntimeError("Model not trained or loaded. "
                                "Call fit() or load() first.")
+
+        size_values = self._watch_data["size"].dropna()
+        yop_values = self._watch_data["yop"].dropna()
+        if size_values.empty or yop_values.empty:
+            raise ValueError(
+                "Cannot derive size/yop input ranges: the column contains "
+                "no valid (non-missing) values."
+            )
 
         return {
             "brands":    self._watch_data["brand"].value_counts().index.tolist(),
@@ -306,12 +424,12 @@ class WatchPriceModel:
             "bracelets": self._watch_data["bracelet_material"].value_counts().index.tolist(),
             "sexes":     self._watch_data["sex"].value_counts().index.tolist(),
             "size_range": (
-                int(self._watch_data["size"].min()),
-                int(self._watch_data["size"].max()),
+                int(size_values.min()),
+                int(size_values.max()),
             ),
             "yop_range": (
-                int(self._watch_data["yop"].min()),
-                int(self._watch_data["yop"].max()),
+                int(yop_values.min()),
+                int(yop_values.max()),
             ),
         }
 
@@ -331,6 +449,7 @@ class WatchPriceModel:
             "pipeline":        self._pipeline,
             "ridge_pipeline":  self._ridge_pipeline,
             "X_train":         self._X_train,
+            "y_train":         self._y_train,
             "X_test":          self._X_test,
             "y_test":          self._y_test,
             "watch_data":      self._watch_data,
@@ -350,6 +469,7 @@ class WatchPriceModel:
         self._pipeline        = checkpoint["pipeline"]
         self._ridge_pipeline  = checkpoint["ridge_pipeline"]
         self._X_train         = checkpoint["X_train"]
+        self._y_train         = checkpoint["y_train"]
         self._X_test          = checkpoint["X_test"]
         self._y_test          = checkpoint["y_test"]
         self._watch_data      = checkpoint["watch_data"]
@@ -367,6 +487,58 @@ class WatchPriceModel:
         df[self._CATEGORICAL_COLS] = df[self._CATEGORICAL_COLS].fillna("Unknown")
         return df
 
+    def _validate_predict_inputs(self, categorical_inputs: dict,
+                                 size: float | None,
+                                 yop: int | None) -> None:
+        """
+        Validate one set of prediction inputs against the fitted dataset.
+
+        Categorical values are checked against the same data source that
+        get_valid_options() exposes to the UI, so every value offered
+        there passes validation. Numeric values are checked against the
+        plausibility bounds used during data cleaning.
+
+        Parameters
+        ----------
+        categorical_inputs : dict
+            Mapping of feature column name to the user-supplied value.
+        size : float or None
+            Case diameter in mm.
+        yop : int or None
+            Year of production.
+
+        Raises
+        ------
+        ValueError
+            If a categorical value does not occur in the fitted dataset,
+            or a numeric value lies outside its plausible range.
+        """
+        for col, value in categorical_inputs.items():
+            if value == "Unknown":
+                # "Unknown" is the model's own placeholder for missing
+                # categoricals (see _preprocess) and is always accepted.
+                continue
+            known = self._watch_data[col].dropna().unique()
+            if value not in known:
+                raise ValueError(
+                    f"Unknown value {value!r} for '{col}'. "
+                    "Use get_valid_options() to list the known values."
+                )
+
+        size_min, size_max = self._SIZE_RANGE_MM
+        if size is not None and not size_min <= size <= size_max:
+            raise ValueError(
+                f"size must be between {size_min} and {size_max} mm "
+                f"(or None), got {size!r}."
+            )
+
+        current_year = datetime.date.today().year
+        if yop is not None and not self._YOP_MIN <= yop <= current_year:
+            raise ValueError(
+                f"yop must be between {self._YOP_MIN} and {current_year} "
+                f"(or None), got {yop!r}."
+            )
+
     def _split(self, data: pd.DataFrame, test_size: float,
                random_state: int) -> None:
         """Split into train/test and apply category dtypes."""
@@ -380,7 +552,13 @@ class WatchPriceModel:
 
         for col in self._LOW_CARD_COLS:
             self._X_train[col] = self._X_train[col].astype("category")
-            self._X_test[col]  = self._X_test[col].astype("category")
+            # Anchor the test set to the *training* categories so the
+            # integer codes XGBoost consumes are identical in both frames.
+            # Levels occurring only in the test split become NaN (missing).
+            self._X_test[col] = pd.Categorical(
+                self._X_test[col],
+                categories=self._X_train[col].cat.categories,
+            )
 
         # Fit Ridge baseline here so it shares the same train/test split
         self._fit_ridge_baseline()

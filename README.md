@@ -24,9 +24,9 @@ You will notice that the code appears in two places. This is intentional:
 
 **The notebook (`LuxuryWatches.ipynb`)** is the story. It walks through every step of the project — data loading, cleaning, exploration, modelling, and evaluation — with full explanations and visualizations at each stage. It is meant to be read and graded.
 
-**The source files (`src/`)** are the engine. The same logic is implemented as clean, documented Python classes that power the Streamlit app and the training script. This separation means the app can run without anyone ever opening Jupyter, and it demonstrates good software design: one source of truth, separate from the presentation layer.
+**The source files (`src/`)** are the engine. The same logic is re-implemented as clean, documented Python classes that power the Streamlit app and the training script. This separation means the app can run without anyone ever opening Jupyter.
 
-In short: the notebook is for understanding, the classes are for deployment.
+In short: the notebook is hand-written step by step so the whole analysis stays transparent and reproducible for the reader, while the `src/` classes mirror that same logic in a form built for deployment. The two are maintained in parallel and kept in sync by hand.
 
 ------------------------------------------------------------------------
 
@@ -34,11 +34,15 @@ In short: the notebook is for understanding, the classes are for deployment.
 
 ### 1. Clone the repository and install dependencies
 
+This project requires **Python ≥ 3.11**.
+
 ``` bash
 git clone https://github.com/yannickallmann/CodingAtHSG.git
 cd CodingAtHSG
 pip install -r requirements.txt
 ```
+
+**macOS note:** XGBoost relies on the OpenMP runtime, which is not bundled with the pip wheel. If `import xgboost` fails with a `libomp.dylib` error, install it once with `brew install libomp`.
 
 ### 2. Train and save the model
 
@@ -56,7 +60,13 @@ The trained model is saved to `models/watch_price_model.joblib`. You only need t
 streamlit run app.py
 ```
 
-This opens the interactive price estimator in your browser. Select a brand, model, and watch specifications, then click "Estimate Price".
+If the `streamlit` command is not found (e.g. in PowerShell when the Python scripts folder is not on PATH), run it through Python instead — using the same Python you installed the requirements with:
+
+``` bash
+python -m streamlit run app.py
+```
+
+Either way, run the command from the repository root so the app finds `src/` and `models/`. The estimator opens in your browser at `http://localhost:8501` (open the URL manually if it doesn't). Select a brand, model, and watch specifications, then click "Estimate Price". Stop the app with `Ctrl+C` in the terminal.
 
 ### 4. (Optional) Run the notebook
 

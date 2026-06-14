@@ -10,6 +10,7 @@ Usage:
 """
 
 import datetime
+import os
 import re
 
 import numpy as np
@@ -39,7 +40,14 @@ class WatchDataCleaner:
         ----------
         filepath : str
             Path to the raw Watches.csv file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file does not exist at the given path.
         """
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"Dataset not found: {filepath}")
         self.filepath = filepath
         self._data: pd.DataFrame | None = None
 
@@ -81,15 +89,40 @@ class WatchDataCleaner:
         and 'condition'. Neither is complete on its own, but together they
         cover all rows without any conflicting values. We consolidate them
         into 'cond' and drop the redundant 'condition' column.
+
+        Handles all column combinations gracefully: if only one of the two
+        columns exists it is used as-is, and if neither exists an explicit
+        error is raised here instead of a confusing KeyError further down
+        the pipeline.
+
+        Raises
+        ------
+        KeyError
+            If the raw data contains neither 'cond' nor 'condition'.
         """
-        if "condition" in self._data.columns:
+        has_cond = "cond" in self._data.columns
+        has_condition = "condition" in self._data.columns
+
+        if has_cond and has_condition:
             self._data["cond"] = self._data["cond"].fillna(self._data["condition"])
             self._data.drop(columns=["condition"], inplace=True)
+        elif has_condition:
+            self._data.rename(columns={"condition": "cond"}, inplace=True)
+        elif not has_cond:
+            raise KeyError(
+                "Expected a 'cond' and/or 'condition' column in the raw data."
+            )
 
     def _clean_size(self) -> None:
         """
         Parse raw size strings into a single plausible case diameter (mm).
-        Entries outside the range 20–60 mm are treated as missing.
+
+        Entries outside the range 20–60 mm are treated as missing: real
+        wristwatch case diameters fall within this span, so numbers
+        outside it are almost certainly parsing artifacts (e.g. lug
+        widths, depth ratings, bracelet lengths) rather than true
+        diameters. Flagging them as missing keeps the row while
+        discarding the implausible value.
         """
         self._data["size"] = (
             self._data["size"].apply(self._parse_size).astype("Int64")
@@ -98,7 +131,12 @@ class WatchDataCleaner:
     def _clean_yop(self) -> None:
         """
         Extract the four-digit year from the raw year-of-production strings.
-        Values below 1500 or above the current year are treated as missing.
+
+        Values below 1500 or above the current year are treated as
+        missing: 1500 predates the earliest portable watches, and future
+        years are impossible, so such values must be data entry errors.
+        The bounds deliberately err on the permissive side to retain
+        antique pieces while discarding obvious mistakes.
         """
         current_year = datetime.date.today().year
         yop_numeric = (
