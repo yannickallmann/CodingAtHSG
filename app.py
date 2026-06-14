@@ -1,12 +1,27 @@
+"""
+app.py
+------
+Streamlit web app for the Luxury Watch Price Estimator.
+
+Workflow (the notebook is NOT required; it is separate documentation):
+    pip install -r requirements.txt
+    python train.py        # trains and saves models/watch_price_model.joblib
+    streamlit run app.py    # loads that model and serves the UI
+
+Run from the repository root so that src/ is importable.
+"""
+
+import os
+
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import shap
 import time
-from model_utils import BrandModelEncoder
+
+from src.model import WatchPriceModel
 
 st.set_page_config(page_title="Watch Price Estimator", page_icon="⌚", layout="centered")
 
@@ -357,11 +372,26 @@ def price_category(price):
     else:              return "Ultra Luxury", "#C8A96E"
 
 # ── Load model ────────────────────────────────────────────────────────────────
+MODEL_PATH = "models/watch_price_model.joblib"
+
 @st.cache_resource
 def load_model():
-    return joblib.load("watch_price_model.pkl")
+    """Load the WatchPriceModel trained and saved by train.py."""
+    m = WatchPriceModel()
+    m.load(MODEL_PATH)
+    return m
 
-pipeline = load_model()
+if not os.path.exists(MODEL_PATH):
+    st.error(
+        "No trained model found. Run `python train.py` once to create "
+        "models/watch_price_model.joblib, then restart the app."
+    )
+    st.stop()
+
+model = load_model()
+pipeline = model._pipeline      # fitted sklearn Pipeline (target_encoder + xgb)
+X_train = model._X_train        # training features, used to anchor categories
+LOW_CARD_COLS = ["movement", "case_material", "bracelet_material", "condition", "sex"]
 
 # ── Hero ──────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -443,8 +473,14 @@ with tab1:
                 'yop': use_year, 'condition': use_condition, 'sex': use_sex, 'size': use_size
             }])
 
-            for col in ['movement', 'case_material', 'bracelet_material', 'condition', 'sex']:
-                input_data[col] = pd.Categorical(input_data[col], categories=CAT_MAPPINGS[col])
+            # Anchor categories to the *training* categories the model saw, so
+            # XGBoost receives identical integer codes. Unseen values become NaN
+            # (handled as missing). Column order must match the training frame.
+            for col in LOW_CARD_COLS:
+                input_data[col] = pd.Categorical(
+                    input_data[col], categories=X_train[col].cat.categories
+                )
+            input_data = input_data[X_train.columns]
 
             log_price = pipeline.predict(input_data)[0]
             price = np.exp(log_price)
@@ -497,14 +533,22 @@ with tab1:
             fitted_xgb     = pipeline.named_steps["xgb"]
 
             input_for_shap = fitted_encoder.transform(input_data.copy())
-            for col in ['movement', 'case_material', 'bracelet_material', 'condition', 'sex']:
-                input_for_shap[col] = pd.Categorical(input_for_shap[col], categories=CAT_MAPPINGS[col])
+            for col in LOW_CARD_COLS:
+                input_for_shap[col] = pd.Categorical(
+                    input_for_shap[col], categories=X_train[col].cat.categories
+                )
 
             explainer   = shap.TreeExplainer(fitted_xgb)
             shap_values = explainer.shap_values(input_for_shap)
 
-            feature_names = ['Brand', 'Model', 'Movement', 'Case Material',
-                             'Bracelet Material', 'Year', 'Condition', 'Category', 'Size']
+            # Labels follow the training column order (input_data was reordered
+            # to X_train.columns above) so the SHAP bars stay correctly named.
+            _LABELS = {
+                "brand": "Brand", "model": "Model", "case_material": "Case Material",
+                "condition": "Condition", "size": "Size", "movement": "Movement",
+                "yop": "Year", "bracelet_material": "Bracelet Material", "sex": "Category",
+            }
+            feature_names = [_LABELS[c] for c in X_train.columns]
             shap_vals = shap_values[0]
             sorted_idx = np.argsort(np.abs(shap_vals))[::-1]
 

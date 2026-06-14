@@ -30,7 +30,7 @@ print(f"Dataset ready: {df.shape[0]:,} rows, {df.shape[1]} columns")
 
 print("\nStep 2: Training model (this takes a few minutes)...")
 model = WatchPriceModel()
-model.fit(df)
+model.fit(df, n_iter=25)
 
 print("\nStep 3: Evaluating model...")
 results = model.evaluate()
