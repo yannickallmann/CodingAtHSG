@@ -398,7 +398,7 @@ st.markdown("""
 <div class="hero">
     <div class="hero-eyebrow">HSG · Skills: Introduction to Programming</div>
     <div class="hero-title">Watch Price<br>Estimator</div>
-    <div class="hero-sub">Trained on 280,000+ listings · Chrono24</div>
+    <div class="hero-sub">Trained on 284,000+ listings · Chrono24</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -452,12 +452,14 @@ with tab1:
                                help="Year of production. Defaults to 2015 if left blank.")
 
     if st.button("Estimate Price"):
-        missing = []
-        if brand == PLACEHOLDER:       missing.append("Brand")
-        if watch_model == PLACEHOLDER: missing.append("Model")
+        problems = []
+        if brand == PLACEHOLDER:       problems.append("Please select a Brand")
+        if watch_model == PLACEHOLDER: problems.append("Please select a Model")
+        if year is not None and not (1950 <= year <= 2026):
+            problems.append("Year must be between 1950 and 2026")
 
-        if missing:
-            st.markdown(f'<div class="warning-box"><div class="warning-text">Please select: {", ".join(missing)}</div></div>', unsafe_allow_html=True)
+        if problems:
+            st.markdown(f'<div class="warning-box"><div class="warning-text">{"<br>".join(problems)}</div></div>', unsafe_allow_html=True)
         else:
             use_movement          = movement if movement != PLACEHOLDER else 'Automatic'
             use_case_material     = case_material if case_material != PLACEHOLDER else 'Steel'
@@ -587,7 +589,7 @@ with tab1:
 with tab2:
     st.markdown("""
     <div class="insight-title">Market Insights</div>
-    <div class="insight-sub">Based on 280,000+ Chrono24 listings</div>
+    <div class="insight-sub">Based on 284,000+ Chrono24 listings</div>
     """, unsafe_allow_html=True)
 
     # ── Chart 1: Median price per brand ──────────────────────────────────────
