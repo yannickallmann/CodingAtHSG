@@ -34,42 +34,57 @@ In short: the notebook is hand-written step by step so the whole analysis stays 
 
 ### 1. Clone the repository and install dependencies
 
-This project requires **Python ≥ 3.11**.
+This project requires **Python ≥ 3.11**. The commands work on Windows, macOS, and Linux — use the block for your system.
 
+**Windows (PowerShell):**
 
-To run it in powershell with the following commands:
-
-``` bash
+``` powershell
 git clone https://github.com/yannickallmann/CodingAtHSG.git
 cd CodingAtHSG
 pip install -r requirements.txt
 ```
 
-**macOS note:** XGBoost relies on the OpenMP runtime, which is not bundled with the pip wheel. If `import xgboost` fails with a `libomp.dylib` error, install it once with `brew install libomp`.
+**macOS / Linux (Terminal):**
+
+``` bash
+git clone https://github.com/yannickallmann/CodingAtHSG.git
+cd CodingAtHSG
+pip3 install -r requirements.txt
+```
+
+> **macOS only:** XGBoost needs the OpenMP runtime, which is not bundled with the pip wheel. If `import xgboost` later fails with a `libomp.dylib` error, install it once with `brew install libomp`.
 
 ### 2. Train and save the model
 
-This step trains the XGBoost model and saves it to disk. It takes roughly 20 minutes depending on your machine.
+This step trains the XGBoost model and saves it to `models/watch_price_model.joblib`. It takes roughly 20 minutes depending on your machine, and you only need to do it once.
 
-``` bash
+**Windows:**
+
+``` powershell
 python train.py
 ```
 
-The trained model is saved to `models/watch_price_model.joblib`. You only need to do this once.
+**macOS / Linux:**
+
+``` bash
+python3 train.py
+```
 
 ### 3. Launch the Streamlit app
 
-``` bash
-streamlit run app.py
-```
+**Windows:**
 
-If the `streamlit` command is not found (e.g. in PowerShell when the Python scripts folder is not on PATH), run it through Python instead — using the same Python you installed the requirements with:
-
-``` bash
+``` powershell
 python -m streamlit run app.py
 ```
 
-Either way, run the command from the repository root so the app finds `src/` and `models/`. The estimator opens in your browser at `http://localhost:8501` (open the URL manually if it doesn't). Select a brand, model, and watch specifications, then click "Estimate Price". Stop the app with `Ctrl+C` in the terminal.
+**macOS / Linux:**
+
+``` bash
+python3 -m streamlit run app.py
+```
+
+We use `python -m streamlit ...` because it works as long as you use the same Python you installed the requirements with; if `streamlit` is already on your PATH, plain `streamlit run app.py` works too. Run the command from the repository root so the app finds `src/` and `models/`. The estimator opens in your browser at `http://localhost:8501` (open the URL manually if it doesn't). Select a brand, model, and watch specifications, then click "Estimate Price". Stop the app with `Ctrl+C` in the terminal.
 
 ### 4 Run the notebook
 
