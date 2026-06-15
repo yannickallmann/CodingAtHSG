@@ -22,7 +22,7 @@ We work with a Kaggle dataset of luxury watch listings, clean it, explore it, an
 
 You will notice that the code appears in two places. This is intentional:
 
-**The notebook (`LuxuryWatches.ipynb`)** is the story. It walks through every step of the project — data loading, cleaning, exploration, modelling, and evaluation — with full explanations and visualizations at each stage. It is meant to be read and graded. It shows how we progressed through the project.
+**The notebook (`LuxuryWatches.ipynb`)** is the story. It walks through every step of the project: data loading, cleaning, exploration, modelling, and evaluation with full explanations and visualizations at each stage. It is meant to be read and graded. It shows how we progressed through the project.
 
 **The source files (`src/`)** are the engine. The same logic is re-implemented as clean, documented Python classes that power the Streamlit app and the training script. This separation means the app can run without anyone ever opening Jupyter. All you need to do to run it is to run `train.py` to train the model and then start the app via `app.py`.
 
@@ -116,7 +116,7 @@ We apply the log transformation to the price target and prepare categorical vari
 
 ### Part 6: Machine Learning
 
-Three-step process: baselines (Dummy + Ridge), XGBoost pipeline with target encoding and hyperparameter tuning via RandomizedSearchCV, and final evaluation using MAPE. The tuned model achieves a MAPE of 30.3%, compared to 216.7% for the naive baseline and 40.3% for Ridge.
+Three-step process: baselSines (Dummy + Ridge), XGBoost pipeline with target encoding and hyperparameter tuning via RandomizedSearchCV, and final evaluation using MAPE. The tuned model achieves a MAPE of 30.3%, compared to 216.7% for the naive baseline and 40.3% for Ridge.
 
 Visualizations include a MAPE comparison chart, a SHAP waterfall plot for a single prediction, and a feature importance chart. These are interpreted carefully — brand and model dominate importance scores partly because they carry price information through target encoding, not necessarily because of independent causal effects.
 
