@@ -1,6 +1,6 @@
 pandas>=2.0,<4
 numpy>=2.0,<3
-matplotlib>=3.10,<4
+matplotlib>=3.9,<4
 seaborn>=0.13,<1
 scikit-learn>=1.8,<2
 category-encoders>=2.9,<3
