@@ -1,8 +1,17 @@
 """
 eda.py
 ------
-Responsible for all exploratory data analysis visualizations.
+Encapsulates all exploratory data analysis visualizations for the luxury
+watch dataset as a self-contained class.
 
+Note on design intent:
+    The notebook (LuxuryWatches.ipynb) reproduces these plots inline for
+    presentation and grading purposes. This class exists as the reusable,
+    importable counterpart — anyone who wants to regenerate the full EDA
+    programmatically without running the notebook can do so by importing
+    WatchEDA directly. This separation keeps the notebook thin and the
+    plotting logic testable and reusable.
+    
 Usage:
     from src.eda import WatchEDA
     eda = WatchEDA(df)
